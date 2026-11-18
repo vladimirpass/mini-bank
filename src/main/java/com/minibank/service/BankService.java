@@ -1,5 +1,7 @@
 package com.minibank.service;
 
+import com.minibank.exception.AccountNotFoundException;
+import com.minibank.exception.InsufficientFundsException;
 import com.minibank.model.Account;
 import com.minibank.model.Client;
 
@@ -97,7 +99,8 @@ public class BankService {
         } catch (SQLException e) {
             throw new RuntimeException("Error fetching account", e);
         }
-        throw new IllegalArgumentException("Account not found: " + accountId);
+        // Выбрасываем кастомное исключение для 404
+        throw new AccountNotFoundException("Account not found: " + accountId);
     }
 
     public Client getClient(Long clientId) {
@@ -112,22 +115,28 @@ public class BankService {
         } catch (SQLException e) {
             throw new RuntimeException("Error fetching client", e);
         }
-        throw new IllegalArgumentException("Client not found: " + clientId);
+        // Для клиента тоже можно использовать AccountNotFoundException (или создать ClientNotFoundException)
+        throw new AccountNotFoundException("Client not found: " + clientId);
     }
 
-    // ВНИМАНИЕ: Баг "исчезающих денег" сохранен намеренно!
     public void transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
+        // Валидация суммы (переносим из хендлера)
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than 0");
+        }
+
         Account from = getAccount(fromAccountId);
 
         if (from.getBalance().compareTo(amount) < 0) {
-            throw new IllegalStateException("Insufficient funds on account " + fromAccountId);
+            // Выбрасываем кастомное исключение для 409
+            throw new InsufficientFundsException("Insufficient funds on account " + fromAccountId);
         }
 
-        // Списание (до проверки получателя!)
+        // Списание (до проверки получателя — баг сохранен!)
         updateBalance(fromAccountId, from.getBalance().subtract(amount));
         recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
 
-        // Если получателя нет — деньги пропадают
+        // Если получателя нет — деньги пропадают (баг)
         Account to = getAccount(toAccountId);
 
         updateBalance(toAccountId, to.getBalance().add(amount));
@@ -160,4 +169,3 @@ public class BankService {
         }
     }
 }
-
