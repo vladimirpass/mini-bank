@@ -11,10 +11,10 @@ public class HttpServerApp {
         BankService bankService = new BankService();
         HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
-        // Регистрируем обработчики для разных путей
+        // Регистрируем обработчики клиентов, счетов и переводов.
         server.createContext("/clients", new ApiHandler(bankService, "/clients"));
         server.createContext("/accounts", new ApiHandler(bankService, "/accounts"));
-        server.createContext("/transfer", new ApiHandler(bankService, "/transfer"));
+        server.createContext("/transfers", new ApiHandler(bankService, "/transfers"));
 
         server.setExecutor(null);
         server.start();

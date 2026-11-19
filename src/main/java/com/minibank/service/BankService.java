@@ -4,6 +4,7 @@ import com.minibank.exception.AccountNotFoundException;
 import com.minibank.exception.InsufficientFundsException;
 import com.minibank.model.Account;
 import com.minibank.model.Client;
+import com.minibank.model.Transaction;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -14,6 +15,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 public class BankService {
@@ -23,11 +26,9 @@ public class BankService {
     private String password;
 
     public BankService() {
-        // Загружаем настройки из db.properties
         try (InputStream input = getClass().getClassLoader().getResourceAsStream("db.properties")) {
             Properties prop = new Properties();
             if (input == null) {
-                // Фолбэк, если файл не найден
                 url = "jdbc:postgresql://localhost:5432/minibank";
                 username = "postgres";
                 password = "postgres";
@@ -63,7 +64,6 @@ public class BankService {
     }
 
     public Account openAccount(Long clientId, String accountNumber) {
-        // Проверяем, существует ли клиент
         getClient(clientId);
 
         String sql = "INSERT INTO accounts (client_id, account_number, balance) VALUES (?, ?, ?) RETURNING id";
@@ -99,7 +99,6 @@ public class BankService {
         } catch (SQLException e) {
             throw new RuntimeException("Error fetching account", e);
         }
-        // Выбрасываем кастомное исключение для 404
         throw new AccountNotFoundException("Account not found: " + accountId);
     }
 
@@ -115,28 +114,23 @@ public class BankService {
         } catch (SQLException e) {
             throw new RuntimeException("Error fetching client", e);
         }
-        // Для клиента тоже можно использовать AccountNotFoundException (или создать ClientNotFoundException)
         throw new AccountNotFoundException("Client not found: " + clientId);
     }
 
     public void transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
-        // Валидация суммы (переносим из хендлера)
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount must be greater than 0");
         }
 
         Account from = getAccount(fromAccountId);
-
         if (from.getBalance().compareTo(amount) < 0) {
-            // Выбрасываем кастомное исключение для 409
             throw new InsufficientFundsException("Insufficient funds on account " + fromAccountId);
         }
 
-        // Списание (до проверки получателя — баг сохранен!)
+        // Учебный баг сохраняется до модуля 7.1.
         updateBalance(fromAccountId, from.getBalance().subtract(amount));
         recordTransaction(fromAccountId, amount.negate(), "TRANSFER_OUT");
 
-        // Если получателя нет — деньги пропадают (баг)
         Account to = getAccount(toAccountId);
 
         updateBalance(toAccountId, to.getBalance().add(amount));
@@ -167,5 +161,35 @@ public class BankService {
         } catch (SQLException e) {
             throw new RuntimeException("Error recording transaction", e);
         }
+    }
+
+    public List<Transaction> getTransactions(Long accountId) {
+        getAccount(accountId);
+        String sql = """
+                SELECT id, account_id, amount, type, transaction_date
+                FROM transactions
+                WHERE account_id = ?
+                ORDER BY transaction_date DESC, id DESC
+                """;
+
+        List<Transaction> transactions = new ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setLong(1, accountId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    transactions.add(new Transaction(
+                            rs.getLong("id"),
+                            rs.getLong("account_id"),
+                            rs.getBigDecimal("amount"),
+                            rs.getString("type"),
+                            rs.getObject("transaction_date", LocalDateTime.class)
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error fetching transactions", e);
+        }
+        return transactions;
     }
 }
