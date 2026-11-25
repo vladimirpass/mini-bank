@@ -5,7 +5,7 @@ import com.minibank.service.BankService;
 public class ClientAccountsSqlDemo {
     public static void main(String[] args) {
         try (BankService bank = new BankService()) {
-            System.out.println("=== Начало замера EAGER ===");
+            System.out.println("=== Начало замера JOIN FETCH ===");
 
             var clients = bank.getClientsWithAccounts();
             for (var client : clients) {

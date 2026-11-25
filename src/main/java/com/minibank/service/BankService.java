@@ -155,9 +155,22 @@ public class BankService implements AutoCloseable {
     }
     public List<Client> getClientsWithAccounts() {
         try (EntityManager em = factory.createEntityManager()) {
-            return em.createQuery("select c from Client c order by c.id", Client.class)
+            return em.createQuery("select c from Client c left join fetch c.accounts order by c.id", Client.class)
                     .getResultList();
         }
+    }
+
+    public void removeAccountFromClient(Long clientId, Long accountId) {
+        inTransaction(em -> {
+            Client client = findClient(em, clientId);
+            boolean removed = client.getAccounts()
+                    .removeIf(account -> accountId.equals(account.getId()));
+
+            if (!removed) {
+                throw new AccountNotFoundException("Account not found: " + accountId);
+            }
+            return null;
+        });
     }
 
     @Override

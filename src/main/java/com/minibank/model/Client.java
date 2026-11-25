@@ -24,12 +24,27 @@ public class Client {
     private String email;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "client", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "client", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Account> accounts = new ArrayList<>();
 
     public Client(Long id, String name, String email) {
         this.id = id;
         this.name = name;
         this.email = email;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+
+        return other instanceof Client client
+                && getEmail() != null
+                && getEmail().equals(client.getEmail());
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hashCode(getEmail());
     }
 }

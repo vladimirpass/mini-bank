@@ -23,7 +23,7 @@ public class Account {
     private Long clientId;
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "client_id", insertable = false, updatable = false)
     private Client client;
 
@@ -34,7 +34,7 @@ public class Account {
     private BigDecimal balance;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "account", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "account", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<Transaction> transactions = new ArrayList<>();
 
     public Account(Long id, Long clientId, String accountNumber, BigDecimal balance) {
@@ -50,5 +50,19 @@ public class Account {
 
     public void changeBalance(BigDecimal balance) {
         this.balance = balance;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+
+        return other instanceof Account account
+                && getAccountNumber() != null
+                && getAccountNumber().equals(account.getAccountNumber());
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hashCode(getAccountNumber());
     }
 }
